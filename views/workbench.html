@@ -2,6 +2,31 @@
 <!DOCTYPE html>
 <html>
 	<head>
+		<script src="https://cdn.jsdelivr.net/npm/mime-types@2.1.35/index.min.js"></script>
+
+		<script>
+			const _origFetch = window.fetch;
+			async function getFile(path) {
+				return new Promise((resolve) => {
+					let handler = (event) => {
+						if (event.data.path == path) {
+							resolve({
+								type: mimeTypes.lookup(event.data.path),
+								body: event.data.body
+							})
+						}
+					}
+					window.addEventListener("message", handler)
+				})
+			}
+			window.fetch = async (url, options) => {
+				if (url.protocol == "server:") {
+					return await getFile(url.pathname.slice(1));
+				} else {
+					return _origFetch(url, options)
+				}
+			}
+		</script>
 		<script>
 			performance.mark('code/didStartRenderer')
 		</script>

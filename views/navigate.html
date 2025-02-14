@@ -6,13 +6,15 @@
         <script>
             (async () => {
                 const site = await (new JSZip()).loadAsync("{{SERVER_BUNDLE}}", {base64: true});
-                window.addEventListener("message" , (e) => {
+                document.querySelector("#frame").srcdoc = await site.file("index.html").async("string")
+                window.addEventListener("message" , async (e) => {
                     alert(e)
                     switch(e.data.type) {
                         case "get_file":
                             e.source.postMessage({
                                 type: "send_file",
-                                data: "test"//site.file(e.data.path)
+                                body: await site.file(e.data.path).async("base64"),
+                                path: e.data.path
                             })
                             break;
                     }
@@ -21,11 +23,6 @@
         </script>
     </head>
     <body>
-        <button id="clickme">Click Me!</button>
-        <script>
-            document.querySelector("#clickme").onclick = () => {
-                window.postMessage({type:"get_file",path:"index.html"})
-            }
-        </script>
+        <iframe id="frame"></iframe>
     </body>
 </html>
