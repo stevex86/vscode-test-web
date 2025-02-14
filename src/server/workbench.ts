@@ -6,7 +6,7 @@
 import * as path from 'path';
 import { promises as fs } from 'fs';
 import { URI } from 'vscode-uri';
-import * as Router from '@koa/router';
+import Router from '@koa/router';
 
 import { GalleryExtensionInfo, IConfig } from './main';
 import { getScannedBuiltinExtensions, IScannedBuiltinExtension, scanForExtensions, URIComponents } from './extensions';
@@ -214,6 +214,8 @@ export default function (config: IConfig): Router.Middleware {
 
 	return router.routes();
 }
+
+export {Workbench};
 
 async function getProductOverrides(vsCodeDevLocation: string): Promise<Record<string, any> | undefined> {
 	try {

@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>VSC Navigator</title>
+        <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+        <script>
+            (async () => {
+                const site = await (new JSZip()).loadAsync("{{SERVER_BUNDLE}}", {base64: true});
+                window.addEventListener("message" , (e) => {
+                    alert(e)
+                    switch(e.data.type) {
+                        case "get_file":
+                            e.source.postMessage({
+                                type: "send_file",
+                                data: "test"//site.file(e.data.path)
+                            })
+                            break;
+                    }
+                })
+            })()
+        </script>
+    </head>
+    <body>
+        <button id="clickme">Click Me!</button>
+        <script>
+            document.querySelector("#clickme").onclick = () => {
+                window.postMessage({type:"get_file",path:"index.html"})
+            }
+        </script>
+    </body>
+</html>

@@ -10,7 +10,7 @@ export interface IConfig {
 	readonly extensionIds: GalleryExtensionInfo[] | undefined;
 	readonly extensionDevelopmentPath: string | undefined;
 	readonly extensionTestsPath: string | undefined;
-	readonly build: Sources | Static | CDN;
+	readonly build: Sources | StaticLocation | CDN;
 	readonly folderUri: string | undefined;
 	readonly folderMountPath: string | undefined;
 	readonly printServerLog: boolean;
@@ -28,12 +28,18 @@ export interface Sources {
 	readonly location: string;
 }
 
-export interface Static {
+interface StaticBase {
 	readonly type: 'static';
-	readonly location: string;
 	readonly quality: 'stable' | 'insider';
 	readonly version: string;
 }
+export interface StaticLocation extends StaticBase {
+	readonly location: string;
+}
+export interface StaticZip extends StaticBase {
+	readonly zip: Buffer;
+}
+export type Static = StaticLocation | StaticZip;
 
 export interface CDN {
 	readonly type: 'cdn';

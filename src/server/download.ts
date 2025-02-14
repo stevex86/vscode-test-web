@@ -3,6 +3,8 @@
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
 
+import tarToZip from "tar-to-zip";
+
 import { promises as fs, existsSync } from 'fs';
 import * as path from 'path';
 
@@ -12,7 +14,10 @@ import { HttpsProxyAgent } from 'https-proxy-agent';
 import { HttpProxyAgent } from 'http-proxy-agent';
 import { URL } from 'url';
 
-import { Static } from './main';
+import { StaticLocation, StaticZip } from './main';
+import { Readable } from 'stream';
+
+import gunzip from "gunzip-maybe";
 
 interface DownloadInfo {
 	url: string;
@@ -47,7 +52,6 @@ async function downloadAndUntar(downloadUrl: string, destination: string, messag
 	}
 
 	const tar = await import('tar-fs');
-	const gunzip = await import('gunzip-maybe');
 
 	return new Promise((resolve, reject) => {
 		const httpLibrary = downloadUrl.startsWith('https') ? https : http;
@@ -55,7 +59,7 @@ async function downloadAndUntar(downloadUrl: string, destination: string, messag
 		httpLibrary.get(downloadUrl, getAgent(downloadUrl), res => {
 			const total = Number(res.headers['content-length']);
 			let received = 0;
-			let timeout: NodeJS.Timeout | undefined;
+			let timeout: Timer | undefined;
 
 			res.on('data', chunk => {
 				if (!timeout) {
@@ -86,8 +90,49 @@ async function downloadAndUntar(downloadUrl: string, destination: string, messag
 	});
 }
 
+async function download(downloadUrl: string, message: string): Promise<Buffer> {
+	process.stdout.write(message);
 
-export async function downloadAndUnzipVSCode(vscodeTestDir: string, quality: 'stable' | 'insider', commit: string | undefined): Promise<Static> {
+	return new Promise((resolve, reject) => {
+		const httpLibrary = downloadUrl.startsWith('https') ? https : http;
+
+		httpLibrary.get(downloadUrl, getAgent(downloadUrl), res => {
+			const total = Number(res.headers['content-length']);
+			let received = 0;
+			let timeout: Timer | undefined;
+			let finalBuffer: Buffer;
+
+			res.on('data', chunk => {
+				if (!timeout) {
+					timeout = setTimeout(() => {
+						process.stdout.write(`${reset}${message}: ${received}/${total} (${(received / total * 100).toFixed()}%)`);
+						timeout = undefined;
+					}, 100);
+				}
+
+				received += chunk.length;
+				if (finalBuffer) {
+					finalBuffer = Buffer.concat([finalBuffer, chunk]);
+				} else {
+					finalBuffer = chunk;
+				}
+			});
+			res.on('error', reject);
+			res.on('end', () => {
+				if (timeout) {
+					clearTimeout(timeout);
+				}
+
+
+				process.stdout.write(`${reset}${message}: complete\n`);
+				resolve(finalBuffer);
+			});
+		});
+	});
+}
+
+
+export async function downloadAndUnzipVSCode(vscodeTestDir: string, quality: 'stable' | 'insider', commit: string | undefined): Promise<StaticLocation> {
 	let downloadURL: string | undefined;
 	if (!commit) {
 		const info = await getLatestBuild(quality);
@@ -124,6 +169,42 @@ export async function downloadAndUnzipVSCode(vscodeTestDir: string, quality: 'st
 		throw Error(`Failed to download and unpack ${productName}.${commit ? ' Did you specify a valid commit?' : ''}`);
 	}
 	return { type: 'static', location: downloadedPath, quality, version: commit };
+}
+
+export async function downloadVSCodeZip(vscodeTestDir: string, quality: 'stable' | 'insider', commit: string | undefined): Promise<StaticZip> {
+	let downloadURL: string | undefined;
+	if (!commit) {
+		const info = await getLatestBuild(quality);
+		commit = info.version;
+		downloadURL = info.url;
+	}
+
+	if (!downloadURL) {
+		downloadURL = await getDownloadURL(quality, commit);
+		if (!downloadURL) {
+			throw Error(`Failed to find a download for ${quality} and ${commit}`);
+		}
+	}
+
+	const productName = `VS Code ${quality === 'stable' ? 'Stable' : 'Insiders'}`;
+
+	let zip;
+	try {
+		const tar = await download(downloadURL, `Downloading ${productName}`);
+		const zipChunks: Array<Buffer> = [];
+		console.log("Converting to zip...");
+		zip = await new Promise((resolve) => tarToZip(Readable.from(tar))
+			.getStream()
+			.on("data", (chunk) => zipChunks.push(chunk))
+			.on("finish", () => {
+				console.log("Finished converting")
+				resolve(Buffer.concat(zipChunks));
+			}))
+	} catch (err) {
+		console.error(err);
+		throw Error(`Failed to download ${productName}.${commit ? ' Did you specify a valid commit?' : ''}`);
+	}
+	return { type: 'static', zip, quality, version: commit };
 }
 
 export async function fetch(api: string): Promise<string> {

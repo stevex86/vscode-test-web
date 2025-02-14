@@ -6,7 +6,7 @@
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
 
-import { IConfig, runServer, Static, Sources } from './main';
+import { IConfig, runServer, Sources, StaticLocation } from './main';
 import { downloadAndUnzipVSCode, directoryExists, fileExists, readFileInRepo } from './download';
 
 import * as playwright from 'playwright';
@@ -229,7 +229,7 @@ export async function runTests(options: Options & { extensionTestsPath: string }
 	});
 }
 
-async function getBuild(options: Options): Promise<Static | Sources> {
+async function getBuild(options: Options): Promise<StaticLocation | Sources> {
 	if (options.vsCodeDevPath) {
 		return {
 			type: 'sources',
